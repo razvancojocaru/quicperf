@@ -1,2 +1,2 @@
 # quicperf
-A QUCK protocol traffic generator based on quic-go
+A QUIC protocol traffic generator based on [quic-go](https://github.com/lucas-clemente/quic-go)
