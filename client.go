@@ -51,13 +51,17 @@ func clientMain() error {
 
 			logger.Infof("Total received %d", nrRead)
 			//total += nrRead
-			defer stream.Close()
-			defer wg.Done()
+			stream.Close()
+			nr, er := stream.Read(buf)
+			nrRead += int64(nr)
+			fmt.Printf("Error %s, nr=%d\n", er.Error(), nr)
+			wg.Done()
 		}()
 	}
 
 	wg.Wait()
 
+	session.Close(nil)
 	fmt.Println(nrRead)
 
 	return nil

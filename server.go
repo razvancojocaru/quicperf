@@ -10,6 +10,7 @@ import (
 	"github.com/lucas-clemente/quic-go"
 	"sync"
 	"fmt"
+	"time"
 )
 
 var addr = "localhost:4443"
@@ -40,11 +41,16 @@ func generateTLSConfig() *tls.Config {
 }
 
 func writeToStream(s quic.Stream, max int) (size int, err error){
-	//var buf []byte
 	size = 0
+	intervalSize := 0
 	start := 0
 	end := BUFSIZE
 
+	var mBytes float64
+
+
+	timeStart := time.Now()
+	intervalStart := timeStart
 	for {
 		var nr int
 		if end < len(sendData) {
@@ -53,19 +59,31 @@ func writeToStream(s quic.Stream, max int) (size int, err error){
 			nr, err = s.Write(sendData[start:])
 			size += nr
 			if err != nil {
-				return
+				break
 			}
 			end = end - len(sendData)
 			nr, err = s.Write(sendData[:end])
 		}
 		size += nr
 		if err != nil {
-			return
+			break
 		}
 		start = end
 		end = end + BUFSIZE
 		if max < size {
 			break
+		}
+
+		now := time.Now()
+		elapsed := now.Sub(intervalStart)
+		if elapsed.Seconds() >= 1 {
+			sec := intervalStart.Sub(timeStart).Seconds()
+			mBytes = float64(size - intervalSize) / 1000000
+
+			fmt.Printf("[ID %d] %.1f - %.1f sec %.2f MBytes %.2f Mbits/sec\n",
+				s.StreamID(), sec, sec+1, mBytes, mBytes * 8)
+			intervalStart = now
+			intervalSize = size
 		}
 	}
 	return
@@ -90,6 +108,7 @@ func handleSession(session quic.Session) {
 				logger.Errorf(err.Error())
 			}
 
+			stream.Context().Done()
 			stream.Close()
 			wg.Done()
 		} ()
