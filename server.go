@@ -13,10 +13,9 @@ import (
 	"time"
 )
 
-var addr = "localhost:4443"
 var numStreams = 1
 var sendData []byte
-var maxData int
+var maxSec int
 const BUFSIZE = 5000
 
 // Setup a bare-bones TLS config for the server
@@ -40,14 +39,14 @@ func generateTLSConfig() *tls.Config {
 	return &tls.Config{Certificates: []tls.Certificate{tlsCert}}
 }
 
-func writeToStream(s quic.Stream, max int) (size int, err error){
+func writeToStream(s quic.Stream) (size int, err error){
 	size = 0
 	intervalSize := 0
 	start := 0
 	end := BUFSIZE
+	elapsedSeconds := 0
 
 	var mBytes float64
-
 
 	timeStart := time.Now()
 	intervalStart := timeStart
@@ -70,20 +69,25 @@ func writeToStream(s quic.Stream, max int) (size int, err error){
 		}
 		start = end
 		end = end + BUFSIZE
-		if max < size {
-			break
-		}
 
 		now := time.Now()
 		elapsed := now.Sub(intervalStart)
 		if elapsed.Seconds() >= 1 {
 			sec := intervalStart.Sub(timeStart).Seconds()
-			mBytes = float64(size - intervalSize) / 1000000
+			mBytes = float64(size-intervalSize) / 1000000
 
 			fmt.Printf("[ID %d] %.1f - %.1f sec %.2f MBytes %.2f Mbits/sec\n",
-				s.StreamID(), sec, sec+1, mBytes, mBytes * 8)
+				s.StreamID(), sec, sec+1, mBytes, mBytes*8)
 			intervalStart = now
 			intervalSize = size
+
+			elapsedSeconds++
+			if maxSec == elapsedSeconds {
+				totalMBytes := float64(size) / 1000000
+				fmt.Printf("[ID %d] %.1f - %.1f sec %.2f MBytes %.2f Mbits/sec\n",
+					s.StreamID(), 0.0, float64(maxSec), totalMBytes, totalMBytes*8 / float64(maxSec))
+				break
+			}
 		}
 	}
 	return
@@ -101,9 +105,9 @@ func handleSession(session quic.Session) {
 			}
 
 			//numWritten, err := stream.Write(sendData)
-			numWritten, err := writeToStream(stream, maxData)
+			_, err = writeToStream(stream)
 
-			fmt.Printf("Sent %d on stream %d\n", numWritten, (i+1)*2)
+			//fmt.Printf("Sent %d on stream %d\n", numWritten, (i+1)*2)
 			if err != nil {
 				logger.Errorf(err.Error())
 			}
@@ -116,10 +120,10 @@ func handleSession(session quic.Session) {
 	wg.Wait()
 }
 
-func serverMain(data []byte, streams int, max int) error {
+func serverMain(addr string, data []byte, streams int, ticks int) error {
 	sendData = data
 	numStreams = streams
-	maxData = max
+	maxSec = ticks
 	listener, err := quic.ListenAddr(addr, generateTLSConfig(), nil)
 	if err != nil {
 		return err

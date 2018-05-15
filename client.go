@@ -11,7 +11,7 @@ import (
 
 var logger = utils.DefaultLogger
 
-func clientMain() error {
+func clientMain(addr string) error {
 	session, err := quic.DialAddr(addr, &tls.Config{InsecureSkipVerify: true}, nil)
 	if err != nil {
 		return err
@@ -42,15 +42,8 @@ func clientMain() error {
 					break
 				}
 			}
-			//nrRead, err := io.Copy(ioutil.Discard, stream)
-			//
-			////_, err = stream.Write([]byte(message))
-			//if err != nil {
-			//	logger.Errorf("--------Error: " + err.Error())
-			//}
 
 			logger.Infof("Total received %d", nrRead)
-			//total += nrRead
 			stream.Close()
 			nr, er := stream.Read(buf)
 			nrRead += int64(nr)
